@@ -107,6 +107,8 @@ internal_test() ->
     erlang:exit(erlang:whereis(group_0), kill),
     receive after 500 -> ok end,
     Child0New = supool:get(group_0),
+    Child1 = supool:get(group_0),
+    Child0New = supool:get(group_0),
     [{2, Child1, _, _},
      {1, Child0New, _, _},
      {supool, _, _, _}] = supervisor:which_children(Supervisor),
