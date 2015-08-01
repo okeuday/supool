@@ -71,8 +71,8 @@
 -record(state,
     {
         supervisor :: pid(),
-        pool = undefined,
-        last_i = undefined :: non_neg_integer() | undefined
+        pool = undefined :: tuple() | undefined,
+        count = undefined :: pos_integer() | undefined
     }).
 
 -type options() ::
@@ -158,15 +158,15 @@ pool_worker_start_link(Name, Supervisor)
 %%%------------------------------------------------------------------------
 
 init([Supervisor]) ->
-    erlang:put(current, 0),
+    erlang:put(current, 1),
     self() ! restart,
     {ok, #state{supervisor = Supervisor}}.
 
 handle_call(get, _, #state{pool = Pool,
-                           last_i = LastI} = State) ->
+                           count = Count} = State) ->
     I = erlang:get(current),
-    erlang:put(current, if I == LastI -> 0; true -> I + 1 end),
-    Pid = pool_get(I, Pool),
+    erlang:put(current, if I == Count -> 1; true -> I + 1 end),
+    Pid = erlang:element(I, Pool),
     case erlang:is_process_alive(Pid) of
         true ->
             {reply, Pid, State};
@@ -188,8 +188,8 @@ handle_info({start, ChildSpecs}, #state{supervisor = Supervisor} = State) ->
         {ok, []} ->
             {stop, {error, noproc}, State};
         {ok, Pids} ->
-            {noreply, State#state{pool = pool_new(Pids),
-                                  last_i = erlang:length(Pids) - 1}};
+            {noreply, State#state{pool = erlang:list_to_tuple(Pids),
+                                  count = erlang:length(Pids)}};
         {error, _} = Error ->
             {stop, Error, State}
     end;
@@ -203,8 +203,8 @@ handle_info(restart, #state{supervisor = Supervisor} = State) ->
         Count ->
             % pool worker restarted
             {noreply,
-             State#state{pool = pool_new(Pids),
-                         last_i = Count - 1}}
+             State#state{pool = erlang:list_to_tuple(Pids),
+                         count = Count}}
     end;
 
 handle_info(Request, State) ->
@@ -227,26 +227,16 @@ update(I, #state{supervisor = Supervisor} = State) ->
         0 ->
             {stop, {error, noproc}, undefined, State};
         Count ->
+            Pool = erlang:list_to_tuple(Pids),
             NewI = if
-                I >= Count ->
-                    erlang:put(current, if 1 == Count -> 0; true -> 1 end),
-                    0;
+                I > Count ->
+                    erlang:put(current, if 1 == Count -> 1; true -> 2 end),
+                    1;
                 true ->
                     I
             end,
-            Pool = pool_new(Pids),
-            {reply, pool_get(NewI, Pool),
+            {reply, erlang:element(NewI, Pool),
              State#state{pool = Pool,
-                         last_i = Count - 1}}
+                         count = Count}}
     end.
-
--compile({inline,
-          [{pool_new, 1},
-           {pool_get, 2}]}).
-
-pool_new([_ | _] = Pids) ->
-    array:fix(array:from_list(Pids)).
-
-pool_get(I, Pool) ->
-    array:get(I, Pool).
 
