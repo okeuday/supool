@@ -7,7 +7,7 @@ Purpose
 Make it simple to start a single Erlang/OTP supervisor ChildSpec as a pool of
 processes with each process selected in round-robin order.
 
-(If you need a pool stored as process heap data,
+(If you need process pools stored as process heap data,
  see [varpool](https://github.com/okeuday/varpool#readme))
 
 Build
