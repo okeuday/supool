@@ -54,7 +54,6 @@
 
 %% external interface
 -export([start_link/4,
-         start_link_done/1,
          start_children/2,
          which_children/1]).
 
@@ -81,25 +80,18 @@ start_link(Name, Count,
     ChildSpecs = lists:foldl(fun(Id, L) ->
         [{Id, StartFunc, Restart, Shutdown, Type, Modules} | L]
     end, [], lists:seq(1, Count)),
-    Result = supervisor:start_link(?MODULE,
-                                   [Name, ChildSpecs, Options, self()]),
+    Result = supervisor:start_link(?MODULE, [Name, Options]),
     case Result of
         {ok, _} ->
-            % the startup needs to be synchronous to make sure pool
-            % processes exist before they are requested
-            receive startup_done -> ok end,
+            PoolWorker = erlang:whereis(Name),
+            true = is_pid(PoolWorker),
+            % needs to be the first message to the pool worker process to
+            % make sure pool processes exist before they are requested
+            PoolWorker ! {start, ChildSpecs},
             Result;
         _ ->
             Result
     end.
-
--spec start_link_done(Parent :: pid()) ->
-    ok.
-
-start_link_done(Parent)
-    when is_pid(Parent) ->
-    Parent ! startup_done,
-    ok.
 
 -spec start_children(Supervisor :: pid(),
                      ChildSpecs :: nonempty_list(supool:child_spec())) ->
@@ -128,7 +120,7 @@ which_children(Supervisor)
 %%% Callback functions from supervisor
 %%%------------------------------------------------------------------------
 
-init([Name, ChildSpecs, Options, Parent]) ->
+init([Name, Options]) ->
     Defaults = [
         {max_r,            ?DEFAULT_MAX_R},
         {max_t,            ?DEFAULT_MAX_T}],
@@ -137,8 +129,7 @@ init([Name, ChildSpecs, Options, Parent]) ->
     true = is_integer(MaxT) andalso (MaxT >= 1),
     {ok, {{one_for_one, MaxR, MaxT}, 
           [{supool,
-            {supool, pool_worker_start_link,
-             [Name, ChildSpecs, self(), Parent]},
+            {supool, pool_worker_start_link, [Name, self()]},
             permanent, brutal_kill, worker, [supool]}]}}.
 
 %%%------------------------------------------------------------------------

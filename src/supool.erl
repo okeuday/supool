@@ -59,7 +59,7 @@
          get/1]).
 
 %% internal interface
--export([pool_worker_start_link/4]).
+-export([pool_worker_start_link/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -70,9 +70,9 @@
 
 -record(state,
     {
-        pool,
-        count,
-        supervisor
+        supervisor :: pid(),
+        pool = undefined :: tuple() | undefined,
+        count = undefined :: pos_integer() | undefined
     }).
 
 -type options() ::
@@ -145,25 +145,21 @@ get(Name)
 %%%------------------------------------------------------------------------
 
 -spec pool_worker_start_link(Name :: atom(),
-                             ChildSpecs :: nonempty_list(child_spec()),
-                             Supervisor :: pid(),
-                             Parent :: pid()) ->
+                             Supervisor :: pid()) ->
     {ok, pid()} |
     {error, any()}.
 
-pool_worker_start_link(Name, [_ | _] = ChildSpecs, Supervisor, Parent)
-    when is_atom(Name), is_list(ChildSpecs), is_pid(Supervisor),
-         is_pid(Parent) ->
-    gen_server:start_link({local, Name}, ?MODULE,
-                          [ChildSpecs, Supervisor, Parent], []).
+pool_worker_start_link(Name, Supervisor)
+    when is_atom(Name), is_pid(Supervisor) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Supervisor], []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
 %%%------------------------------------------------------------------------
 
-init([ChildSpecs, Supervisor, Parent]) ->
-    self() ! {start, ChildSpecs},
-    supool_sup:start_link_done(Parent),
+init([Supervisor]) ->
+    erlang:put(current, 1),
+    self() ! restart,
     {ok, #state{supervisor = Supervisor}}.
 
 handle_call(get, _, #state{pool = Pool,
@@ -175,13 +171,7 @@ handle_call(get, _, #state{pool = Pool,
         true ->
             {reply, Pid, State};
         false ->
-            {NewI, NewState} = update(I, State),
-            if
-                NewState#state.count == 0 ->
-                    {stop, {error, noproc}, undefined, NewState};
-                true ->
-                    {reply, erlang:element(NewI, NewState#state.pool), NewState}
-            end
+            update(I, State)
     end;
 
 handle_call(Request, _, State) ->
@@ -198,11 +188,23 @@ handle_info({start, ChildSpecs}, #state{supervisor = Supervisor} = State) ->
         {ok, []} ->
             {stop, {error, noproc}, State};
         {ok, Pids} ->
-            erlang:put(current, 1),
             {noreply, State#state{pool = erlang:list_to_tuple(Pids),
                                   count = erlang:length(Pids)}};
         {error, _} = Error ->
             {stop, Error, State}
+    end;
+
+handle_info(restart, #state{supervisor = Supervisor} = State) ->
+    Pids = supool_sup:which_children(Supervisor),
+    case erlang:length(Pids) of
+        0 ->
+            % pool worker started for the first time
+            {noreply, State};
+        Count ->
+            % pool worker restarted
+            {noreply,
+             State#state{pool = erlang:list_to_tuple(Pids),
+                         count = Count}}
     end;
 
 handle_info(Request, State) ->
@@ -221,14 +223,20 @@ code_change(_, State, _) ->
 
 update(I, #state{supervisor = Supervisor} = State) ->
     Pids = supool_sup:which_children(Supervisor),
-    Count = erlang:length(Pids),
-    NewState = State#state{pool = erlang:list_to_tuple(Pids),
-                           count = Count},
-    if
-        I > Count ->
-            erlang:put(current, if 1 == Count -> 1; true -> 2 end),
-            {1, NewState};
-        true ->
-            {I, NewState}
+    case erlang:length(Pids) of
+        0 ->
+            {stop, {error, noproc}, undefined, State};
+        Count ->
+            Pool = erlang:list_to_tuple(Pids),
+            NewI = if
+                I > Count ->
+                    erlang:put(current, if 1 == Count -> 1; true -> 2 end),
+                    1;
+                true ->
+                    I
+            end,
+            {reply, erlang:element(NewI, Pool),
+             State#state{pool = Pool,
+                         count = Count}}
     end.
 

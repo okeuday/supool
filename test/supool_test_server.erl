@@ -100,9 +100,13 @@ internal_test() ->
     pong = supool_test_server:ping(Child0),
     pong = supool_test_server:ping(Child1),
     erlang:exit(Child0, kill),
+    receive after 500 -> ok end,
     Child0New = supool:get(group_0),
     true = (Child0 /= Child0New),
     true = is_pid(Child0New),
+    erlang:exit(erlang:whereis(group_0), kill),
+    receive after 500 -> ok end,
+    Child1 = supool:get(group_0),
     erlang:exit(Supervisor, shutdown),
     ok.
 
