@@ -79,7 +79,7 @@ start_link(Name, Count,
     when is_atom(Name), is_integer(Count), Count > 0, is_list(Options) ->
     ChildSpecs = lists:foldl(fun(Id, L) ->
         [{Id, StartFunc, Restart, Shutdown, Type, Modules} | L]
-    end, [], lists:seq(1, Count)),
+    end, [], lists:seq(Count, 1, -1)),
     Result = supervisor:start_link(?MODULE, [Name, Options]),
     case Result of
         {ok, _} ->
@@ -107,14 +107,7 @@ start_children(Supervisor, ChildSpecs)
 
 which_children(Supervisor)
     when is_pid(Supervisor) ->
-    lists:foldl(fun
-        ({supool, _, _, _}, L) ->
-            L;
-        ({_, undefined, _, _}, L) ->
-            L;
-        ({_, Pid, _, _}, L) ->
-            [Pid | L]
-    end, [], supervisor:which_children(Supervisor)).
+    which_child(supervisor:which_children(Supervisor), []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from supervisor
@@ -147,6 +140,15 @@ start_child([ChildSpec | ChildSpecs], Pids, Supervisor) ->
         {error, _} = Error ->
             Error
     end.
+
+which_child([], L) ->
+    L;
+which_child([{supool, _, _, _} | Children], L) ->
+    which_child(Children, L);
+which_child([{_, undefined, _, _} | Children], L) ->
+    which_child(Children, L);
+which_child([{_, Pid, _, _} | Children], L) ->
+    which_child(Children, [Pid | L]).
 
 take_values(DefaultList, List)
     when is_list(DefaultList), is_list(List) ->
