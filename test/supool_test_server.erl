@@ -106,7 +106,7 @@ internal_test() ->
     true = is_pid(Child0New),
     erlang:exit(erlang:whereis(group_0), kill),
     receive after 500 -> ok end,
-    Child1 = supool:get(group_0),
+    Child0New = supool:get(group_0),
     erlang:exit(Supervisor, shutdown),
     ok.
 

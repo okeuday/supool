@@ -137,7 +137,7 @@ init([Name, Options]) ->
 %%%------------------------------------------------------------------------
 
 start_child([], Pids, _) ->
-    {ok, Pids};
+    {ok, lists:reverse(Pids)};
 start_child([ChildSpec | ChildSpecs], Pids, Supervisor) ->
     case supervisor:start_child(Supervisor, ChildSpec) of
         {ok, Pid} ->
