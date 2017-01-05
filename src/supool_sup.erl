@@ -154,7 +154,8 @@ which_child([{_, undefined, _, _} | Children], L, Supervisor) ->
 which_child([{_, restarting, _, _} | _], _, Supervisor) ->
     receive after ?RESTART_DELAY -> ok end,
     which_children(Supervisor);
-which_child([{_, Pid, _, _} | Children], L, Supervisor) ->
+which_child([{_, Pid, _, _} | Children], L, Supervisor)
+    when is_pid(Pid) ->
     which_child(Children, [Pid | L], Supervisor).
 
 take_values(DefaultList, List)
