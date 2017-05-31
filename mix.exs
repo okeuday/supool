@@ -23,7 +23,7 @@ defmodule Supool.Mixfile do
   defp package do
     [files: ~w(src doc test rebar.config README.markdown),
      maintainers: ["Michael Truog"],
-     licenses: ["BSD"],
+     licenses: ["MIT"],
      links: %{"GitHub" => "https://github.com/okeuday/supool"}]
    end
 end
