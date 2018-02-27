@@ -6,7 +6,7 @@ defmodule Supool.Mixfile do
 
   def project do
     [app: :supool,
-     version: "1.7.2",
+     version: "1.7.3",
      description: description(),
      package: package(),
      deps: deps()]
