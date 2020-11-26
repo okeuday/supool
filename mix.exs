@@ -6,7 +6,7 @@ defmodule Supool.Mixfile do
 
   def project do
     [app: :supool,
-     version: "2.0.0",
+     version: "2.0.1",
      language: :erlang,
      erlc_options: [
        :debug_info,
@@ -37,7 +37,7 @@ defmodule Supool.Mixfile do
   end
 
   defp package do
-    [files: ~w(src doc test rebar.config README.markdown),
+    [files: ~w(src doc test rebar.config README.markdown LICENSE),
      maintainers: ["Michael Truog"],
      licenses: ["MIT"],
      links: %{"GitHub" => "https://github.com/okeuday/supool"}]
