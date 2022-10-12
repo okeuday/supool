@@ -6,9 +6,10 @@ defmodule Supool.Mixfile do
 
   def project do
     [app: :supool,
-     version: "2.0.4",
+     version: "2.0.5",
      language: :erlang,
      erlc_options: [
+       :deterministic,
        :debug_info,
        :warn_export_vars,
        :warn_unused_import,
